@@ -1,0 +1,1569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimalist Quantum vs. Classical Maze Race</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            background-color: #ffffff;
+            color: #000000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-color: #ffffff;
+            border: 1px solid #000000;
+            overflow: hidden;
+        }
+        
+        #stats-container {
+            width: 800px;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #ffffff;
+            border: 1px solid #000000;
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+        }
+        
+        .stat-box {
+            text-align: center;
+            padding: 5px 10px;
+        }
+        
+        #quantum-stats {
+            border-left: 2px solid #000000;
+        }
+        
+        #classical-stats {
+            border-left: 2px solid #000000;
+        }
+        
+        canvas {
+            display: block;
+            background-color: #ffffff;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            color: #000000;
+            pointer-events: none;
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            display: none;
+        }
+        
+        #game-over h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #000000;
+        }
+        
+        .play-again-btn {
+            background-color: #000000;
+            color: #ffffff;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        #difficulty-menu {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.95);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 200;
+    }
+    
+    #difficulty-menu h1 {
+        font-size: 32px;
+        margin-bottom: 20px;
+    }
+    
+    .difficulty-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin: 20px 0;
+    }
+    
+    .difficulty-btn {
+        background-color: #000000;
+        color: #ffffff;
+        border: none;
+        padding: 15px 30px;
+        font-size: 18px;
+        cursor: pointer;
+        transition: transform 0.2s, background-color 0.2s;
+        width: 250px;
+        text-align: center;
+    }
+    
+    .difficulty-btn:hover {
+        background-color: #333333;
+        transform: translateY(-2px);
+    }
+    
+    .description {
+        margin-top: 20px;
+        font-style: italic;
+        text-align: center;
+        max-width: 400px;
+    }
+    </style>
+</head>
+<body>
+    <div id="difficulty-menu">
+        <h1>Quantum vs. Classical Maze Race</h1>
+        <p>Choose your difficulty level:</p>
+        <div class="difficulty-buttons">
+            <button id="easy-button" class="difficulty-btn">Easy (8×8)</button>
+            <button id="medium-button" class="difficulty-btn">Medium (12×12)</button>
+            <button id="hard-button" class="difficulty-btn">Hard (16×16)</button>
+            <button id="expert-button" class="difficulty-btn">Quantum Expert (20×20)</button>
+        </div>
+        <div class="description" id="difficulty-description">
+            Select a difficulty to begin
+        </div>
+    </div>
+
+    <div id="game-container">
+        <canvas id="game-canvas" width="800" height="600"></canvas>
+        
+        <div id="controls">
+            WASD or Arrow Keys to move | SPACE to activate quantum tunneling | R to place entanglement points
+        </div>
+        
+        <div class="help-tooltip" id="entanglement-tooltip" style="display: none;">
+            Press SPACE to teleport to the other entanglement point
+        </div>
+        
+        <div id="game-over">
+            <h2 id="result-text"></h2>
+            <div id="game-stats"></div>
+            <button id="play-again" class="play-again-btn">Play Again</button>
+        </div>
+    </div>
+    
+    <div id="stats-container">
+        <div class="stat-box" id="quantum-stats">
+            <div>Quantum Computer (You)</div>
+            <div id="quantum-position">Position: 0, 0</div>
+            <div id="quantum-paths">Paths explored: 0</div>
+        </div>
+        <div class="stat-box" id="maze-stats">
+            <div>Maze Size: 12×12</div>
+            <div id="timer">Time: 0s</div>
+        </div>
+        <div class="stat-box" id="classical-stats">
+            <div>Classical Computer (AI)</div>
+            <div id="classical-position">Position: 0, 0</div>
+            <div id="classical-checked">Cells checked: 0</div>
+        </div>
+    </div>
+    
+    <script>
+        // Game variables
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        let maze = [];
+        let mazeSize = { width: 12, height: 12 }; // Medium complexity
+        let cellSize = 0;
+        let player = { x: 0, y: 0 };
+        let aiPlayer = { x: 0, y: 0 };
+        let exit = { x: 0, y: 0 };
+        let gameStarted = false;
+        let gameEnded = false;
+        let quantumPathsExplored = 0;
+        let classicalCellsChecked = 0;
+        let startTime = 0;
+        let currentTime = 0;
+        let aiPathfinder = null;
+        let optimalPathfinder = null; // For showing optimal path at end
+        let optimalPath = []; // Store the optimal path
+        let quantumCloud = [];
+        let quantumCooldown = 0;
+        let lastAnimationTime = 0;
+        let movementCooldown = 0; // Added movement cooldown
+        let playerPath = new Set(); // Track player's path
+        let showingOptimalPath = false; // Flag for optimal path demo
+        let optimalPathIndex = 0; // Index for animating optimal path
+        let difficulty = 'medium'; // Default difficulty
+    let menuActive = true; // Start with menu open
+        // Add these lines here:
+let entanglementPoints = []; // Can store up to 2 entangled points
+let entanglementCooldown = 0;
+let entanglementEnabled = true; // Flag to enable/disable this power
+        
+        // DOM elements
+        const gameOverPanel = document.getElementById('game-over');
+        const resultText = document.getElementById('result-text');
+        const gameStats = document.getElementById('game-stats');
+        const playAgainButton = document.getElementById('play-again');
+        
+        // Stats elements
+        const quantumPosition = document.getElementById('quantum-position');
+        const quantumPaths = document.getElementById('quantum-paths');
+        const timerElement = document.getElementById('timer');
+        const mazeStatsElement = document.getElementById('maze-stats');
+        const classicalPosition = document.getElementById('classical-position');
+        const classicalChecked = document.getElementById('classical-checked');
+        
+        // Key state
+        const keys = {
+            up: false,
+            down: false,
+            left: false,
+            right: false,
+            space: false
+        };
+        
+        // Set up event listeners
+        function setupEventListeners() {
+    // Keyboard controls
+    window.addEventListener('keydown', (e) => {
+        switch(e.key) {
+            case 'ArrowUp':
+            case 'w':
+            case 'W':
+                keys.up = true;
+                break;
+            case 'ArrowDown':
+            case 's':
+            case 'S':
+                keys.down = true;
+                break;
+            case 'ArrowLeft':
+            case 'a':
+            case 'A':
+                keys.left = true;
+                break;
+            case 'ArrowRight':
+            case 'd':
+            case 'D':
+                keys.right = true;
+                break;
+            case ' ':
+                keys.space = true;
+                break;
+            case 'r':
+            case 'R':
+                if (entanglementCooldown === 0) {
+                    placeEntanglementPointA();
+                }
+                break;
+        }
+    });
+    
+    window.addEventListener('keyup', (e) => {
+        switch(e.key) {
+            case 'ArrowUp':
+            case 'w':
+            case 'W':
+                keys.up = false;
+                break;
+            case 'ArrowDown':
+            case 's':
+            case 'S':
+                keys.down = false;
+                break;
+            case 'ArrowLeft':
+            case 'a':
+            case 'A':
+                keys.left = false;
+                break;
+            case 'ArrowRight':
+            case 'd':
+            case 'D':
+                keys.right = false;
+                break;
+            case ' ':
+                keys.space = false;
+                break;
+        }
+    });
+    
+    // Play again button
+    playAgainButton.addEventListener('click', resetGame);
+}
+
+        // Generate maze using randomized DFS algorithm
+        function generateMaze() {
+            // Calculate cell size based on canvas dimensions
+            cellSize = Math.min(
+                Math.floor(canvas.width / mazeSize.width),
+                Math.floor(canvas.height / mazeSize.height)
+            );
+            
+            // Initialize maze with walls
+            maze = [];
+            for (let y = 0; y < mazeSize.height; y++) {
+                maze[y] = [];
+                for (let x = 0; x < mazeSize.width; x++) {
+                    maze[y][x] = { 
+                        x: x,
+                        y: y,
+                        walls: { top: true, right: true, bottom: true, left: true },
+                        visited: false
+                    };
+                }
+            }
+            
+            // Create a stack for backtracking
+            const stack = [];
+            
+            // Start at a random cell
+            const startX = Math.floor(Math.random() * mazeSize.width);
+            const startY = Math.floor(Math.random() * mazeSize.height);
+            let currentCell = maze[startY][startX];
+            currentCell.visited = true;
+            
+            // DFS to create paths
+            do {
+                const neighbors = getUnvisitedNeighbors(currentCell);
+                
+                if (neighbors.length > 0) {
+                    // Choose a random unvisited neighbor
+                    const nextCell = neighbors[Math.floor(Math.random() * neighbors.length)];
+                    
+                    // Remove walls between current cell and chosen neighbor
+                    removeWalls(currentCell, nextCell);
+                    
+                    // Mark the neighbor as visited and push it to the stack
+                    nextCell.visited = true;
+                    stack.push(currentCell);
+                    currentCell = nextCell;
+                } else if (stack.length > 0) {
+                    // Backtrack
+                    currentCell = stack.pop();
+                }
+            } while (stack.length > 0);
+            
+            // Set player start position (top-left)
+            player = { x: 0, y: 0 };
+            
+            // Remove walls at the entrance
+            maze[player.y][player.x].walls.left = false;
+            
+            // Set exit position (bottom-right)
+            exit = { x: mazeSize.width - 1, y: mazeSize.height - 1 };
+            
+            // Remove walls at the exit
+            maze[exit.y][exit.x].walls.right = false;
+            
+            // Set AI start position (same as player)
+            aiPlayer = { x: 0, y: 0 };
+            
+            // Reset stats
+            quantumPathsExplored = 0;
+            classicalCellsChecked = 0;
+            
+            // Reset player path
+            playerPath = new Set();
+            // Add initial position to player path
+            playerPath.add(`${player.x},${player.y}`);
+            
+            // Initialize AI pathfinder
+            aiPathfinder = new ClassicalPathfinder(maze, aiPlayer, exit);
+            
+            // Create optimal pathfinder (doesn't avoid player path)
+            optimalPathfinder = new ClassicalPathfinder(maze, {x: 0, y: 0}, exit, false);
+            optimalPath = [];
+            
+            // Clear quantum cloud
+            quantumCloud = [];
+            
+            // Update maze stats
+            mazeStatsElement.innerHTML = `Maze Size: ${mazeSize.width}×${mazeSize.height}`;
+        }
+        
+        // Get unvisited neighboring cells
+        function getUnvisitedNeighbors(cell) {
+            const neighbors = [];
+            const { x, y } = cell;
+            
+            // Check top neighbor
+            if (y > 0 && !maze[y - 1][x].visited) {
+                neighbors.push(maze[y - 1][x]);
+            }
+            
+            // Check right neighbor
+            if (x < mazeSize.width - 1 && !maze[y][x + 1].visited) {
+                neighbors.push(maze[y][x + 1]);
+            }
+            
+            // Check bottom neighbor
+            if (y < mazeSize.height - 1 && !maze[y + 1][x].visited) {
+                neighbors.push(maze[y + 1][x]);
+            }
+            
+            // Check left neighbor
+            if (x > 0 && !maze[y][x - 1].visited) {
+                neighbors.push(maze[y][x - 1]);
+            }
+            
+            return neighbors;
+        }
+        
+        // Remove walls between two cells
+        function removeWalls(cell1, cell2) {
+            const xDiff = cell2.x - cell1.x;
+            const yDiff = cell2.y - cell1.y;
+            
+            if (xDiff === 1) {
+                cell1.walls.right = false;
+                cell2.walls.left = false;
+            } else if (xDiff === -1) {
+                cell1.walls.left = false;
+                cell2.walls.right = false;
+            } else if (yDiff === 1) {
+                cell1.walls.bottom = false;
+                cell2.walls.top = false;
+            } else if (yDiff === -1) {
+                cell1.walls.top = false;
+                cell2.walls.bottom = false;
+            }
+        }
+        
+        // Classical pathfinding AI
+        class ClassicalPathfinder {
+    constructor(maze, start, goal, avoidPlayerPath = true) {
+        this.maze = maze;
+        this.start = {...start};
+        this.goal = goal;
+        this.frontier = [];
+        this.visited = new Set();
+        this.path = [];
+        this.current = {...start};
+        this.found = false;
+        this.steps = 0;
+        this.avoidPlayerPath = avoidPlayerPath;
+        this.optimalPath = [];
+        this.optimalSteps = 0; // Track number of steps in optimal path
+        
+        // Initialize with the start position
+        this.frontier.push({
+            x: start.x,
+            y: start.y,
+            path: []
+        });
+    }
+            
+            update() {
+                if (this.found && this.path.length > 0) {
+                    // Move along the found path
+                    const nextStep = this.path.shift();
+                    
+                    // Skip this step if it's on the player's path and we should avoid it
+                    if (this.avoidPlayerPath && playerPath.has(`${nextStep.x},${nextStep.y}`)) {
+                        // Recalculate path to avoid player path
+                        this.found = false;
+                        this.path = [];
+                        this.frontier = [];
+                        
+                        // Add current position back to frontier
+                        this.frontier.push({
+                            x: this.current.x,
+                            y: this.current.y,
+                            path: []
+                        });
+                        return;
+                    }
+                    
+                    this.current.x = nextStep.x;
+                    this.current.y = nextStep.y;
+                    return;
+                }
+                
+                if (this.frontier.length === 0) {
+                    return; // No path found
+                }
+                
+                // Get the next position to explore
+                const current = this.frontier.shift();
+                
+                // If we've already visited this cell, skip
+                const key = `${current.x},${current.y}`;
+                if (this.visited.has(key) || (this.avoidPlayerPath && playerPath.has(key))) {
+                    return;
+                }
+                
+                // Mark as visited
+                this.visited.add(key);
+                classicalCellsChecked++;
+                
+                // Check if we reached the goal
+                if (current.x === this.goal.x && current.y === this.goal.y) {
+                    this.found = true;
+                    this.path = [...current.path];
+                    this.optimalPath = [...current.path, {x: this.goal.x, y: this.goal.y}];
+                    return;
+                }
+                
+                // Get possible moves from the current position
+                const moves = this.getPossibleMoves(current);
+                
+                // Add moves to the frontier (avoiding player path if needed)
+                for (const move of moves) {
+                    if (!this.avoidPlayerPath || !playerPath.has(`${move.x},${move.y}`)) {
+                        this.frontier.push({
+                            x: move.x,
+                            y: move.y,
+                            path: [...current.path, move]
+                        });
+                    }
+                }
+                
+                this.steps++;
+            }
+            
+            // Calculate full path in one go (for optimal path demonstration)
+// Complete calculateFullPath method for the ClassicalPathfinder class
+calculateFullPath() {
+    // Continue searching until we find the goal or exhaust all possibilities
+    while (!this.found && this.frontier.length > 0) {
+        this.update();
+    }
+    
+    // If no path was found, return an empty path
+    if (!this.found) {
+        return {
+            path: [],
+            steps: 0,
+            time: 0
+        };
+    }
+    
+    // Calculate optimal path (including start and end positions)
+    this.optimalPath = [...this.path, {x: this.goal.x, y: this.goal.y}];
+    
+    // Set optimal steps (path length)
+    this.optimalSteps = this.optimalPath.length;
+    
+    // Calculate optimal time based on movement speed
+    // Explanation: In your game, player movement has a cooldown (movementCooldown = 10)
+    // This means each step takes 10 frames to complete
+    // In a standard browser, requestAnimationFrame runs at about 60 frames per second
+    // So we calculate: (number of steps × frames per step) ÷ frames per second = time in seconds
+    const framesPerStep = 10; // Same as movementCooldown
+    const totalFrames = this.optimalSteps * framesPerStep;
+    const framesPerSecond = 60; // Standard animation frame rate
+    const optimalTimeSeconds = totalFrames / framesPerSecond;
+    
+    // Return the path information
+    return {
+        path: this.optimalPath,
+        steps: this.optimalSteps,
+        time: optimalTimeSeconds.toFixed(1) // Rounded to 1 decimal place
+    };
+}
+            
+
+            getPossibleMoves(position) {
+                const { x, y } = position;
+                const cell = this.maze[y][x];
+                const moves = [];
+                
+                // Check each direction based on walls
+                if (!cell.walls.top && y > 0) {
+                    moves.push({ x, y: y - 1 });
+                }
+                
+                if (!cell.walls.right && x < mazeSize.width - 1) {
+                    moves.push({ x: x + 1, y });
+                }
+                
+                if (!cell.walls.bottom && y < mazeSize.height - 1) {
+                    moves.push({ x, y: y + 1 });
+                }
+                
+                if (!cell.walls.left && x > 0) {
+                    moves.push({ x: x - 1, y });
+                }
+                
+                return moves;
+            }
+            
+            getCurrentPosition() {
+                return this.current;
+            }
+        }
+        
+
+        // Quantum tunneling ability
+        function activateQuantumTunneling() {
+    if (quantumCooldown > 0) return;
+    
+    // Instead of exploring arbitrary paths, we'll check specifically which walls we can pass through
+    const visitedCells = [];
+    
+    // Convert playerPath Set to array of positions
+    const playerPathArray = Array.from(playerPath).map(pos => {
+        const [x, y] = pos.split(',').map(Number);
+        return { x, y };
+    });
+    
+    // Check each adjacent cell to see if we can tunnel through walls
+    const currentCell = maze[player.y][player.x];
+    const possibleTunnels = [];
+    
+    // Check top
+    if (player.y > 0) {
+        const hasVisitedAdjacent = playerPathArray.some(pos => 
+            pos.x === player.x && pos.y === player.y - 1
+        );
+        if (currentCell.walls.top && hasVisitedAdjacent) {
+            possibleTunnels.push({ x: player.x, y: player.y - 1, direction: 'top' });
+        }
+    }
+    
+    // Check right
+    if (player.x < mazeSize.width - 1) {
+        const hasVisitedAdjacent = playerPathArray.some(pos => 
+            pos.x === player.x + 1 && pos.y === player.y
+        );
+        if (currentCell.walls.right && hasVisitedAdjacent) {
+            possibleTunnels.push({ x: player.x + 1, y: player.y, direction: 'right' });
+        }
+    }
+    
+    // Check bottom
+    if (player.y < mazeSize.height - 1) {
+        const hasVisitedAdjacent = playerPathArray.some(pos => 
+            pos.x === player.x && pos.y === player.y + 1
+        );
+        if (currentCell.walls.bottom && hasVisitedAdjacent) {
+            possibleTunnels.push({ x: player.x, y: player.y + 1, direction: 'bottom' });
+        }
+    }
+    
+    // Check left
+    if (player.x > 0) {
+        const hasVisitedAdjacent = playerPathArray.some(pos => 
+            pos.x === player.x - 1 && pos.y === player.y
+        );
+        if (currentCell.walls.left && hasVisitedAdjacent) {
+            possibleTunnels.push({ x: player.x - 1, y: player.y, direction: 'left' });
+        }
+    }
+    
+    // If we have possible tunnels, create a quantum cloud with them
+    if (possibleTunnels.length > 0) {
+        quantumCloud = possibleTunnels.map(tunnel => ({
+            x: tunnel.x,
+            y: tunnel.y,
+            probability: 1 / possibleTunnels.length,
+            direction: tunnel.direction
+        }));
+        
+        quantumPathsExplored += quantumCloud.length;
+        
+        // Set cooldown
+        quantumCooldown = 60; // frames
+    }
+}
+        
+        // Move player based on current key state
+        function movePlayer() {
+    // Only allow movement when cooldown is complete
+    if (movementCooldown > 0) {
+        movementCooldown--;
+        return;
+    }
+    
+    const cell = maze[player.y][player.x];
+    let moved = false;
+    
+    if (keys.up && !cell.walls.top && player.y > 0) {
+        player.y -= 1;
+        moved = true;
+    } else if (keys.down && !cell.walls.bottom && player.y < mazeSize.height - 1) {
+        player.y += 1;
+        moved = true;
+    } else if (keys.left && !cell.walls.left && player.x > 0) {
+        player.x -= 1;
+        moved = true;
+    } else if (keys.right && !cell.walls.right && player.x < mazeSize.width - 1) {
+        player.x += 1;
+        moved = true;
+    }
+    
+    // Add current position to player path if moved
+    if (moved) {
+        playerPath.add(`${player.x},${player.y}`);
+        movementCooldown = 10; // Adjust this value to control movement speed
+    }
+    
+    // Check if we are on an entanglement point
+    const isOnEntanglementPoint = entanglementPoints.length === 2 && 
+        entanglementPoints.some(point => point.x === player.x && point.y === player.y);
+    
+    // Prioritize teleportation if on entanglement point
+    if (keys.space && isOnEntanglementPoint && entanglementCooldown === 0) {
+        activateEntanglementTeleport();
+    }
+    // Otherwise use tunneling
+    else if (keys.space && quantumCloud.length === 0 && movementCooldown === 0) {
+        activateQuantumTunneling();
+    }
+    
+    // Update stats
+    quantumPosition.textContent = `Position: ${player.x}, ${player.y}`;
+    quantumPaths.textContent = `Paths explored: ${quantumPathsExplored}`;
+    
+    // Check for teleportation hint
+    checkEntanglementTeleport();
+}
+
+        // Update quantum cloud
+        function updateQuantumCloud() {
+    if (quantumCloud.length > 0) {
+        // Chance to collapse to a position
+        if (Math.random() < 0.1) {
+            // Weight by probability
+            const weights = quantumCloud.map(p => p.probability);
+            const totalWeight = weights.reduce((a, b) => a + b, 0);
+            const randomValue = Math.random() * totalWeight;
+            
+            let cumulativeWeight = 0;
+            let selectedPosition = null;
+            
+            for (let i = 0; i < quantumCloud.length; i++) {
+                cumulativeWeight += weights[i];
+                if (randomValue <= cumulativeWeight) {
+                    // Save selected position
+                    selectedPosition = quantumCloud[i];
+                    break;
+                }
+            }
+            
+            if (selectedPosition) {
+                // Teleport to this position
+                player.x = selectedPosition.x;
+                player.y = selectedPosition.y;
+                
+                // Add teleport destination to player path
+                playerPath.add(`${player.x},${player.y}`);
+                
+                // Visual effect for wall passing (optional)
+                // Could add particle effects or temporary wall visibility changes here
+            }
+            
+            quantumCloud = [];
+        }
+    }
+    
+    // Reduce cooldown
+    if (quantumCooldown > 0) {
+        quantumCooldown--;
+    }
+}
+
+        // Draw the maze
+        function drawMaze() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Calculate offset to center the maze
+    const offsetX = (canvas.width - mazeSize.width * cellSize) / 2;
+    const offsetY = (canvas.height - mazeSize.height * cellSize) / 2;
+    
+    // Convert playerPath Set to array of positions for easier checking
+    const playerPathArray = Array.from(playerPath).map(pos => {
+        const [x, y] = pos.split(',').map(Number);
+        return { x, y };
+    });
+    
+    // Draw cells
+    for (let y = 0; y < mazeSize.height; y++) {
+        for (let x = 0; x < mazeSize.width; x++) {
+            const cell = maze[y][x];
+            const cellX = offsetX + x * cellSize;
+            const cellY = offsetY + y * cellSize;
+            
+            // Draw cell background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(cellX, cellY, cellSize, cellSize);
+            
+            // Check if this cell is the current player position
+            const isPlayerCell = (x === player.x && y === player.y);
+            
+            // Draw walls with special highlighting for tunnelable walls
+            ctx.lineWidth = 1;
+            
+            // Top wall
+            if (cell.walls.top) {
+                const canTunnelTop = isPlayerCell && y > 0 && 
+                    playerPathArray.some(pos => pos.x === x && pos.y === y - 1);
+                
+                ctx.strokeStyle = canTunnelTop ? '#0066ff' : '#000000';
+                ctx.beginPath();
+                ctx.moveTo(cellX, cellY);
+                ctx.lineTo(cellX + cellSize, cellY);
+                ctx.stroke();
+            }
+            
+            // Right wall
+            if (cell.walls.right) {
+                const canTunnelRight = isPlayerCell && x < mazeSize.width - 1 && 
+                    playerPathArray.some(pos => pos.x === x + 1 && pos.y === y);
+                
+                ctx.strokeStyle = canTunnelRight ? '#0066ff' : '#000000';
+                ctx.beginPath();
+                ctx.moveTo(cellX + cellSize, cellY);
+                ctx.lineTo(cellX + cellSize, cellY + cellSize);
+                ctx.stroke();
+            }
+            
+            // Bottom wall
+            if (cell.walls.bottom) {
+                const canTunnelBottom = isPlayerCell && y < mazeSize.height - 1 && 
+                    playerPathArray.some(pos => pos.x === x && pos.y === y + 1);
+                
+                ctx.strokeStyle = canTunnelBottom ? '#0066ff' : '#000000';
+                ctx.beginPath();
+                ctx.moveTo(cellX, cellY + cellSize);
+                ctx.lineTo(cellX + cellSize, cellY + cellSize);
+                ctx.stroke();
+            }
+            
+            // Left wall
+            if (cell.walls.left) {
+                const canTunnelLeft = isPlayerCell && x > 0 && 
+                    playerPathArray.some(pos => pos.x === x - 1 && pos.y === y);
+                
+                ctx.strokeStyle = canTunnelLeft ? '#0066ff' : '#000000';
+                ctx.beginPath();
+                ctx.moveTo(cellX, cellY);
+                ctx.lineTo(cellX, cellY + cellSize);
+                ctx.stroke();
+            }
+            
+            // Draw exit marker
+            if (x === exit.x && y === exit.y) {
+                ctx.fillStyle = '#555555';
+                ctx.beginPath();
+                ctx.arc(
+                    cellX + cellSize / 2,
+                    cellY + cellSize / 2,
+                    cellSize / 4,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+            }
+        }
+    }
+    
+    // Draw player's path trail
+    for (const key of playerPath) {
+        const [x, y] = key.split(',').map(Number);
+        
+        // Skip the current player position (will be drawn as player)
+        if (x === player.x && y === player.y) continue;
+        
+        const pathX = offsetX + x * cellSize;
+        const pathY = offsetY + y * cellSize;
+        
+        // Use the same black color as the player character
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        
+        // Draw a smaller rectangle to make it look like footprints
+        const padding = cellSize / 4;
+        ctx.fillRect(
+            pathX + padding, 
+            pathY + padding, 
+            cellSize - (padding * 2), 
+            cellSize - (padding * 2)
+        );
+    }
+    
+    // Visualize AI's visited cells (in very light gray)
+    if (aiPathfinder && aiPathfinder.visited) {
+        for (const key of aiPathfinder.visited) {
+            const [x, y] = key.split(',').map(Number);
+            
+            // Skip the current AI position (will be drawn as AI)
+            if (x === aiPlayer.x && y === aiPlayer.y) continue;
+            
+            const visitedX = offsetX + x * cellSize;
+            const visitedY = offsetY + y * cellSize;
+            
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.1)';
+            ctx.fillRect(visitedX, visitedY, cellSize, cellSize);
+        }
+    }
+    
+    // Draw optimal path if showing it
+    if (showingOptimalPath && optimalPath.length > 0) {
+        // Draw all steps up to current index
+        for (let i = 0; i <= Math.min(optimalPathIndex, optimalPath.length - 1); i++) {
+            const step = optimalPath[i];
+            const pathX = offsetX + step.x * cellSize;
+            const pathY = offsetY + step.y * cellSize;
+            
+            // Draw a path marker (slightly transparent gray circle)
+            ctx.fillStyle = 'rgba(100, 100, 100, 0.7)';
+            ctx.beginPath();
+            ctx.arc(
+                pathX + cellSize / 2,
+                pathY + cellSize / 2,
+                cellSize / 4,
+                0,
+                Math.PI * 2
+            );
+            ctx.fill();
+        }
+        
+        // Draw current position in optimal path animation (will be the AI in demo mode)
+        if (optimalPathIndex < optimalPath.length) {
+            const pos = optimalPath[optimalPathIndex];
+            aiPlayer.x = pos.x;
+            aiPlayer.y = pos.y;
+        }
+    }
+    
+    // Draw entanglement points
+    drawEntanglementPoints();
+    
+    // Draw quantum cloud (probability wave) in grayscale
+    if (quantumCloud.length > 0) {
+        for (const position of quantumCloud) {
+            const cellX = offsetX + position.x * cellSize;
+            const cellY = offsetY + position.y * cellSize;
+            
+            const opacity = position.probability * 0.5;
+            ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+            ctx.fillRect(cellX, cellY, cellSize, cellSize);
+        }
+    }
+    
+    // Draw quantum player (black)
+    const playerX = offsetX + player.x * cellSize;
+    const playerY = offsetY + player.y * cellSize;
+    
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.arc(
+        playerX + cellSize / 2,
+        playerY + cellSize / 2,
+        cellSize / 3,
+        0,
+        Math.PI * 2
+    );
+    ctx.fill();
+    
+    // Draw AI player (gray)
+    const aiX = offsetX + aiPlayer.x * cellSize;
+    const aiY = offsetY + aiPlayer.y * cellSize;
+    
+    ctx.fillStyle = '#666666';
+    ctx.beginPath();
+    ctx.arc(
+        aiX + cellSize / 2,
+        aiY + cellSize / 2,
+        cellSize / 3,
+        0,
+        Math.PI * 2
+    );
+    ctx.fill();
+}
+        
+        // Reset the game
+        function resetGame() {
+        gameOverPanel.style.display = 'none';
+        
+        generateMaze();
+        gameStarted = true;
+        gameEnded = false;
+        startTime = Date.now();
+        
+        // Update maze stats display to include difficulty
+        mazeStatsElement.innerHTML = `
+            Maze Size: ${mazeSize.width}×${mazeSize.height}
+            <div>Difficulty: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}</div>
+        `;
+        
+        // Reset quantum entanglement
+        resetEntanglement();
+        
+        // Start game loop
+        requestAnimationFrame(gameLoop);
+    }
+
+// Game loop
+function gameLoop(timestamp) {
+    // Skip game updates if menu is active
+    if (menuActive) {
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+    
+    // Calculate delta time
+    const deltaTime = timestamp - lastAnimationTime;
+    lastAnimationTime = timestamp;
+    
+    if (!gameEnded) {
+        // Update game time
+        currentTime = (Date.now() - startTime) / 1000;
+        timerElement.textContent = `Time: ${currentTime.toFixed(1)}s`;
+        
+        // Move player (with controlled speed)
+        movePlayer();
+        
+        // Update AI pathfinder (speed based on difficulty)
+        if (aiPathfinder && Math.random() < aiMoveProbability) {
+            aiPathfinder.update();
+            aiPlayer = aiPathfinder.getCurrentPosition();
+            classicalPosition.textContent = `Position: ${aiPlayer.x}, ${aiPlayer.y}`;
+            classicalChecked.textContent = `Cells checked: ${classicalCellsChecked}`;
+        }
+        
+        // Update quantum effects
+        updateQuantumCloud();
+        updateEntanglementCooldown();
+        
+        // Check if player or AI reached the exit
+        if (player.x === exit.x && player.y === exit.y) {
+            gameOver('player');
+            return;
+        } else if (aiPlayer.x === exit.x && aiPlayer.y === exit.y) {
+            gameOver('ai');
+            return;
+        }
+        
+        // Draw the maze and entities
+        drawMaze();
+        
+        // Request next frame
+        requestAnimationFrame(gameLoop);
+    } else if (showingOptimalPath) {
+        // Continue rendering during optimal path animation
+        drawMaze();
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+// Game over
+// Update the gameOver function to display optimal path info
+function gameOver(winner) {
+    gameEnded = true;
+    
+    resultText.textContent = winner === 'player' 
+        ? 'Quantum Computing Wins!' 
+        : 'Classical Computing Wins!';
+        
+    const finishTime = ((Date.now() - startTime) / 1000).toFixed(1);
+    
+    // Calculate optimal path if not already done
+    let optimalResult = { path: [], steps: 0, time: 0 };
+    if (optimalPath.length === 0) {
+        optimalResult = optimalPathfinder.calculateFullPath();
+        optimalPath = optimalResult.path;
+    } else {
+        optimalResult = {
+            path: optimalPath,
+            steps: optimalPath.length,
+            time: ((optimalPath.length * 10) / 60).toFixed(1) // Calculate time if not already done
+        };
+    }
+    
+    // Create the game stats display
+    gameStats.innerHTML = `
+        <p>Difficulty: ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}</p>
+        <p>Maze Size: ${mazeSize.width}×${mazeSize.height}</p>
+        <p>Your Time: ${finishTime} seconds</p>
+        <p>Optimal Path Time: ${optimalResult.time} seconds</p>
+        <p>Optimal Path Length: ${optimalResult.steps} steps</p>
+        <p>Quantum paths explored: ${quantumPathsExplored}</p>
+        <p>Classical cells checked: ${classicalCellsChecked}</p>
+        <p>Quantum to Classical efficiency ratio: ${(classicalCellsChecked / (quantumPathsExplored || 1)).toFixed(2)}</p>
+        <p><strong>Showing optimal solution...</strong></p>
+    `;
+    
+    // Performance evaluation based on comparison to optimal time
+    const timeRatio = parseFloat(finishTime) / parseFloat(optimalResult.time);
+    let performanceMessage = "";
+    
+    if (winner === 'player') {
+        if (timeRatio <= 1.1) {
+            performanceMessage = "<p class='performance excellent'>Perfect! You found the optimal solution!</p>";
+        } else if (timeRatio <= 1.5) {
+            performanceMessage = "<p class='performance great'>Great job! Very close to optimal!</p>";
+        } else if (timeRatio <= 2.0) {
+            performanceMessage = "<p class='performance good'>Good performance! Try to find more shortcuts.</p>";
+        } else {
+            performanceMessage = "<p class='performance ok'>You won, but there's a faster path. Try again!</p>";
+        }
+    } else {
+        performanceMessage = "<p class='performance losing'>The AI found a faster path. Try using quantum abilities more!</p>";
+    }
+    
+    // Add performance message to stats
+    gameStats.innerHTML += performanceMessage;
+    
+    // Start showing optimal path
+    showingOptimalPath = true;
+    optimalPathIndex = 0;
+    
+    // Reset AI to start for the demo
+    aiPlayer = { x: 0, y: 0 };
+    
+    // Start animation of the optimal path
+    animateOptimalPath();
+    
+    // Add a menu button to the game over screen
+    const menuButton = document.createElement('button');
+    menuButton.className = 'play-again-btn';
+    menuButton.style.marginRight = '10px';
+    menuButton.textContent = 'Main Menu';
+    menuButton.addEventListener('click', () => {
+        // Show menu
+        document.getElementById('difficulty-menu').style.display = 'flex';
+        menuActive = true;
+        gameOverPanel.style.display = 'none';
+    });
+    
+    // Insert menu button before play again button
+    const playAgainButton = document.getElementById('play-again');
+    playAgainButton.parentNode.insertBefore(menuButton, playAgainButton);
+    
+    // Don't show game over panel immediately, wait for path animation
+    setTimeout(() => {
+        gameOverPanel.style.display = 'flex';
+    }, 2000 + (optimalPath.length * 100)); // Delay based on path length
+}
+
+// Add CSS for performance messages
+const styleElement = document.createElement('style');
+styleElement.textContent = `
+.performance {
+    font-weight: bold;
+    padding: 5px 10px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 10px;
+}
+.performance.excellent {
+    background-color: #4CAF50;
+    color: white;
+}
+.performance.great {
+    background-color: #8BC34A;
+    color: black;
+}
+.performance.good {
+    background-color: #FFC107;
+    color: black;
+}
+.performance.ok {
+    background-color: #FF9800;
+    color: black;
+}
+.performance.losing {
+    background-color: #F44336;
+    color: white;
+}
+`;
+document.head.appendChild(styleElement);
+
+// Animate the optimal path after the game ends
+// Enhanced animation of the optimal path with timer
+function animateOptimalPath() {
+    // Create an on-screen timer for the animation
+    let animationTimer = document.createElement('div');
+    animationTimer.id = 'animation-timer';
+    animationTimer.style.position = 'absolute';
+    animationTimer.style.top = '20px';
+    animationTimer.style.left = '50%';
+    animationTimer.style.transform = 'translateX(-50%)';
+    animationTimer.style.padding = '5px 10px';
+    animationTimer.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    animationTimer.style.color = 'white';
+    animationTimer.style.borderRadius = '4px';
+    animationTimer.style.fontSize = '16px';
+    animationTimer.style.zIndex = '150';
+    document.getElementById('game-container').appendChild(animationTimer);
+    
+    // Animation step time in ms
+    const stepTime = 100;
+    
+    // Start time for animation
+    const animStartTime = Date.now();
+    
+    // Function to animate a single step
+    function animateStep() {
+        if (optimalPathIndex >= optimalPath.length) {
+            // Animation complete, clean up
+            document.getElementById('game-container').removeChild(animationTimer);
+            return;
+        }
+        
+        // Update timer display
+        const elapsedTime = (Date.now() - animStartTime) / 1000;
+        animationTimer.textContent = `Optimal Path Time: ${elapsedTime.toFixed(1)}s`;
+        
+        // Update AI position for visualization
+        const pos = optimalPath[optimalPathIndex];
+        aiPlayer.x = pos.x;
+        aiPlayer.y = pos.y;
+        
+        // Draw current frame
+        drawMaze();
+        
+        // Move to next step after a delay
+        setTimeout(() => {
+            optimalPathIndex++;
+            animateStep();
+        }, stepTime);
+    }
+    
+    // Start the animation
+    animateStep();
+}
+
+        // Initialize game
+        setupEventListeners();
+        
+        // Start the game immediately
+        resetGame();
+
+// Add to your setupEventListeners function
+function setupQuantumEntanglement() {
+    // R key for entanglement point A
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'r' || e.key === 'R') {
+            if (entanglementCooldown === 0) {
+                placeEntanglementPointA();
+            }
+        } else if (e.key === ' ' && entanglementPoints.length === 1) {
+            // Space activates teleportation if standing on a point
+            activateEntanglementTeleport();
+        }
+    });
+}
+
+// Place entanglement point A
+function placeEntanglementPointA() {
+    if (entanglementCooldown > 0 || !entanglementEnabled) return;
+    
+    // Create entanglement point at current position
+    const point = { x: player.x, y: player.y };
+    
+    // If no points exist, add as first point
+    if (entanglementPoints.length === 0) {
+        entanglementPoints.push(point);
+        entanglementCooldown = 15; // Short cooldown
+    } 
+    // If one point exists and we're not on it, add as second point
+    else if (entanglementPoints.length === 1 && 
+            !(player.x === entanglementPoints[0].x && player.y === entanglementPoints[0].y)) {
+        entanglementPoints.push(point);
+        entanglementCooldown = 15; // Short cooldown
+    }
+    // If two points already exist, replace the oldest
+    else if (entanglementPoints.length === 2) {
+        entanglementPoints.shift(); // Remove oldest point
+        entanglementPoints.push(point); // Add new point
+        entanglementCooldown = 15; // Short cooldown
+    }
+}
+
+// Teleport between entanglement points
+function activateEntanglementTeleport() {
+    if (entanglementCooldown > 0 || !entanglementEnabled || entanglementPoints.length < 2) return;
+    
+    // Determine which point we're on and teleport to the other
+    const isOnFirstPoint = (player.x === entanglementPoints[0].x && player.y === entanglementPoints[0].y);
+    const isOnSecondPoint = (player.x === entanglementPoints[1].x && player.y === entanglementPoints[1].y);
+    
+    if (isOnFirstPoint) {
+        // Teleport to second point
+        player.x = entanglementPoints[1].x;
+        player.y = entanglementPoints[1].y;
+        entanglementCooldown = 60; // Cooldown after teleportation
+    } else if (isOnSecondPoint) {
+        // Teleport to first point
+        player.x = entanglementPoints[0].x;
+        player.y = entanglementPoints[0].y;
+        entanglementCooldown = 60; // Cooldown after teleportation
+    }
+    
+    // Add teleport destination to player path
+    playerPath.add(`${player.x},${player.y}`);
+    
+    // Increment quantum paths explored
+    quantumPathsExplored++;
+}
+
+// Update entanglement cooldown in game loop
+function updateEntanglementCooldown() {
+    if (entanglementCooldown > 0) {
+        entanglementCooldown--;
+    }
+}
+
+// Draw entanglement points
+function drawEntanglementPoints() {
+    if (entanglementPoints.length === 0) return;
+    
+    const offsetX = (canvas.width - mazeSize.width * cellSize) / 2;
+    const offsetY = (canvas.height - mazeSize.height * cellSize) / 2;
+    
+    // Draw entanglement points
+    entanglementPoints.forEach((point, index) => {
+        const pointX = offsetX + point.x * cellSize + cellSize / 2;
+        const pointY = offsetY + point.y * cellSize + cellSize / 2;
+        
+        // Draw entanglement marker (purple circle)
+        ctx.fillStyle = index === 0 ? 'rgba(128, 0, 128, 0.5)' : 'rgba(128, 0, 128, 0.8)';
+        ctx.beginPath();
+        ctx.arc(pointX, pointY, cellSize / 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw connecting line if we have two points
+        if (entanglementPoints.length === 2 && index === 0) {
+            const point2X = offsetX + entanglementPoints[1].x * cellSize + cellSize / 2;
+            const point2Y = offsetY + entanglementPoints[1].y * cellSize + cellSize / 2;
+            
+            ctx.strokeStyle = 'rgba(128, 0, 128, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 3]); // Dashed line
+            ctx.beginPath();
+            ctx.moveTo(pointX, pointY);
+            ctx.lineTo(point2X, point2Y);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset line dash
+        }
+    });
+}
+
+// Add to your resetGame function
+function resetEntanglement() {
+    entanglementPoints = [];
+    entanglementCooldown = 0;
+}
+
+// Add this to your movePlayer function to check for teleportation
+function checkEntanglementTeleport() {
+    if (entanglementPoints.length === 2) {
+        const isOnPoint = entanglementPoints.some(
+            point => point.x === player.x && point.y === player.y
+        );
+        
+        if (isOnPoint) {
+            // Display teleport hint
+            const hintElement = document.getElementById('entanglement-tooltip');
+            if (hintElement) {
+                hintElement.textContent = "Press SPACE to teleport to the other entanglement point";
+                hintElement.style.display = 'block';
+                
+                // Hide after 2 seconds
+                setTimeout(() => {
+                    hintElement.style.display = 'none';
+                }, 2000);
+            }
+        }
+    }
+}
+
+function setupDifficultyMenu() {
+        // Get button elements
+        const easyButton = document.getElementById('easy-button');
+        const mediumButton = document.getElementById('medium-button');
+        const hardButton = document.getElementById('hard-button');
+        const expertButton = document.getElementById('expert-button');
+        const descriptionElement = document.getElementById('difficulty-description');
+        const difficultyMenu = document.getElementById('difficulty-menu');
+        
+        // Description texts
+        const descriptions = {
+            easy: "Smaller maze with slower AI - perfect for beginners.",
+            medium: "Standard maze with balanced difficulty.",
+            hard: "Larger maze with faster AI - a real challenge!",
+            expert: "Massive maze with aggressive AI - only for quantum masters!"
+        };
+        
+        // Button event listeners
+        easyButton.addEventListener('mouseover', () => {
+            descriptionElement.textContent = descriptions.easy;
+        });
+        
+        mediumButton.addEventListener('mouseover', () => {
+            descriptionElement.textContent = descriptions.medium;
+        });
+        
+        hardButton.addEventListener('mouseover', () => {
+            descriptionElement.textContent = descriptions.hard;
+        });
+        
+        expertButton.addEventListener('mouseover', () => {
+            descriptionElement.textContent = descriptions.expert;
+        });
+        
+        // Start game with selected difficulty
+        easyButton.addEventListener('click', () => {
+            difficulty = 'easy';
+            mazeSize = { width: 8, height: 8 };
+            startGameWithDifficulty();
+        });
+        
+        mediumButton.addEventListener('click', () => {
+            difficulty = 'medium';
+            mazeSize = { width: 12, height: 12 };
+            startGameWithDifficulty();
+        });
+        
+        hardButton.addEventListener('click', () => {
+            difficulty = 'hard';
+            mazeSize = { width: 16, height: 16 };
+            startGameWithDifficulty();
+        });
+        
+        expertButton.addEventListener('click', () => {
+            difficulty = 'expert';
+            mazeSize = { width: 20, height: 20 };
+            startGameWithDifficulty();
+        });
+    }
+    
+    // Start game with selected difficulty
+    function startGameWithDifficulty() {
+        // Hide menu
+        document.getElementById('difficulty-menu').style.display = 'none';
+        menuActive = false;
+        
+        // Apply difficulty settings
+        switch (difficulty) {
+            case 'easy':
+                // Slower AI for easy mode
+                aiMoveProbability = 0.05;
+                break;
+            case 'medium':
+                // Default AI speed
+                aiMoveProbability = 0.08;
+                break;
+            case 'hard':
+                // Faster AI for hard mode
+                aiMoveProbability = 0.12;
+                break;
+            case 'expert':
+                // Very fast AI for expert mode
+                aiMoveProbability = 0.15;
+                break;
+        }
+        
+        // Start the game
+        resetGame();
+    }
+    
+    // Add this line to your setupEventListeners function
+    setupDifficultyMenu();
+
+    function drawOptimalPathVisualization() {
+    const offsetX = (canvas.width - mazeSize.width * cellSize) / 2;
+    const offsetY = (canvas.height - mazeSize.height * cellSize) / 2;
+    
+    // First, draw the complete path as a black line
+    if (optimalPath.length > 1) {
+        ctx.strokeStyle = '#000000'; // Dark black
+        ctx.lineWidth = cellSize / 5; // Thicker line
+        ctx.beginPath();
+        
+        // Start from the first point
+        const firstPoint = optimalPath[0];
+        let startX = offsetX + firstPoint.x * cellSize + cellSize / 2;
+        let startY = offsetY + firstPoint.y * cellSize + cellSize / 2;
+        ctx.moveTo(startX, startY);
+        
+        // Draw line through all points of the path
+        for (let i = 1; i <= Math.min(optimalPathIndex, optimalPath.length - 1); i++) {
+            const step = optimalPath[i];
+            const pathX = offsetX + step.x * cellSize + cellSize / 2;
+            const pathY = offsetY + step.y * cellSize + cellSize / 2;
+            ctx.lineTo(pathX, pathY);
+        }
+        
+        ctx.stroke();
+    }
+    
+    // Draw all steps up to current index
+    for (let i = 0; i <= Math.min(optimalPathIndex, optimalPath.length - 1); i++) {
+        const step = optimalPath[i];
+        const pathX = offsetX + step.x * cellSize;
+        const pathY = offsetY + step.y * cellSize;
+        
+        // Draw a dark black circle at each step
+        ctx.fillStyle = '#000000'; // Dark black
+        ctx.beginPath();
+        ctx.arc(
+            pathX + cellSize / 2,
+            pathY + cellSize / 2,
+            cellSize / 4,
+            0,
+            Math.PI * 2
+        );
+        ctx.fill();
+        
+        // Highlight current position differently
+        if (i === optimalPathIndex) {
+            // Current step has an outline
+            ctx.strokeStyle = '#ffffff'; // White outline
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+        
+        // Draw step number for better visualization
+        if (mazeSize.width <= 12) { // Only for smaller mazes to avoid clutter
+            ctx.fillStyle = 'white';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(
+                i + 1,
+                pathX + cellSize / 2,
+                pathY + cellSize / 2
+            );
+        }
+    }
+}
+
+    </script>
+</body>
+</html>
